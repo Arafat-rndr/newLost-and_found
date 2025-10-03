@@ -6,6 +6,7 @@
     {% if items %}
     <div class="row row-cols-1 row-cols-md-2 g-4">
         {% for item in items %}
+        {% if item.status == 'Lost' %}
         <div class="col">
             <div class="card h-100 shadow-sm">
                 {% if item.photo %}
@@ -24,6 +25,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
         {% endfor %}
     </div>
     {% else %}

@@ -20,8 +20,7 @@
                     <p class="card-text"><strong>Category:</strong> {{ item.category }}</p>
                     <p class="card-text"><strong>Location:</strong> {{ item.location }}</p>
                     <p class="card-text"><strong>Reported by:</strong> {{ item.user.username }}</p>
-                    <p class="card-text"><small class="text-muted">Reported at: {{ item.created_at.strftime('%d %b %Y,
-                            %H:%M') }}</small></p>
+                    <p class="card-text"><small class="text-muted">Reported at: {{ item.created_at.strftime('%d %b %Y, %H:%M') }}</small></p>
                 </div>
             </div>
         </div>
@@ -30,6 +29,12 @@
     {% else %}
     <div class="alert alert-info text-center">
         No items reported yet. Be the first to add one!
+    </div>
+    {% endif %}
+
+    {% if current_user.is_authenticated %}
+    <div class="text-center mt-4">
+        <a href="{{ url_for('report') }}" class="btn btn-primary">Report a Lost or Found Item</a>
     </div>
     {% endif %}
 </div>

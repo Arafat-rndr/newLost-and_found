@@ -1,26 +1,24 @@
 {% extends 'base.html' %}
+
 {% block content %}
 <div class="container mt-4">
-    <h2>Welcome, {{ current_user.username }}</h2>
+    <h2 class="mb-4">Welcome, {{ current_user.username }}</h2>
 
-    <div class="row mt-3">
-        <!-- Your Items -->
+    <div class="row">
+        <!-- Items Section -->
         <div class="col-md-8">
             <h4>Your Items</h4>
 
-            <!-- Filter Tabs -->
+            <!-- Tabs -->
             <ul class="nav nav-tabs mb-3" id="itemFilterTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all"
-                        type="button" role="tab">All</button>
+                    <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab">All</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="lost-tab" data-bs-toggle="tab" data-bs-target="#lost" type="button"
-                        role="tab">Lost</button>
+                    <button class="nav-link" id="lost-tab" data-bs-toggle="tab" data-bs-target="#lost" type="button" role="tab">Lost</button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="found-tab" data-bs-toggle="tab" data-bs-target="#found" type="button"
-                        role="tab">Found</button>
+                    <button class="nav-link" id="found-tab" data-bs-toggle="tab" data-bs-target="#found" type="button" role="tab">Found</button>
                 </li>
             </ul>
 
@@ -28,24 +26,110 @@
                 <!-- All Items -->
                 <div class="tab-pane fade show active" id="all" role="tabpanel">
                     {% set items_to_show = items %}
-                    {% include 'items_table.html' %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Status</th>
+                                    <th>Category</th>
+                                    <th>Location</th>
+                                    <th>Reported At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items_to_show %}
+                                <tr>
+                                    <td>{{ item.title }}</td>
+                                    <td>
+                                        {% if item.status == 'Lost' %}
+                                        <span class="badge bg-danger">{{ item.status }}</span>
+                                        {% else %}
+                                        <span class="badge bg-success">{{ item.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.category }}</td>
+                                    <td>{{ item.location }}</td>
+                                    <td>{{ item.created_at.strftime('%d %b %Y, %H:%M') }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% if items_to_show|length == 0 %}
+                                <tr>
+                                    <td colspan="5" class="text-center">No items reported yet.</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Lost Items -->
                 <div class="tab-pane fade" id="lost" role="tabpanel">
                     {% set items_to_show = items | selectattr('status', 'equalto', 'Lost') | list %}
-                    {% include 'items_table.html' %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Category</th>
+                                    <th>Location</th>
+                                    <th>Reported At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items_to_show %}
+                                <tr>
+                                    <td>{{ item.title }}</td>
+                                    <td>{{ item.category }}</td>
+                                    <td>{{ item.location }}</td>
+                                    <td>{{ item.created_at.strftime('%d %b %Y, %H:%M') }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% if items_to_show|length == 0 %}
+                                <tr>
+                                    <td colspan="4" class="text-center">No lost items.</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Found Items -->
                 <div class="tab-pane fade" id="found" role="tabpanel">
                     {% set items_to_show = items | selectattr('status', 'equalto', 'Found') | list %}
-                    {% include 'items_table.html' %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Category</th>
+                                    <th>Location</th>
+                                    <th>Reported At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items_to_show %}
+                                <tr>
+                                    <td>{{ item.title }}</td>
+                                    <td>{{ item.category }}</td>
+                                    <td>{{ item.location }}</td>
+                                    <td>{{ item.created_at.strftime('%d %b %Y, %H:%M') }}</td>
+                                </tr>
+                                {% endfor %}
+                                {% if items_to_show|length == 0 %}
+                                <tr>
+                                    <td colspan="4" class="text-center">No found items.</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Notifications -->
+        <!-- Notifications Section -->
         <div class="col-md-4">
             <h4>Notifications</h4>
             <div class="card shadow-sm mb-3" style="max-height: 400px; overflow-y: auto;">
@@ -54,11 +138,11 @@
                     <li class="list-group-item {% if not note.is_read %}list-group-item-warning{% endif %}">
                         {{ note.message }}
                         <br>
-                        <small class="text-muted">{{ note.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        <small class="text-muted">{{ note.created_at.strftime('%d %b %Y, %H:%M') }}</small>
                     </li>
                     {% endfor %}
                     {% if notifications|length == 0 %}
-                    <li class="list-group-item">No notifications yet.</li>
+                    <li class="list-group-item text-center">No notifications yet.</li>
                     {% endif %}
                 </ul>
             </div>

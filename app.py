@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -8,6 +8,7 @@ from wtforms import StringField, PasswordField, SubmitField, TextAreaField, Sele
 from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
 from flask_wtf.file import FileField, FileAllowed
 from werkzeug.utils import secure_filename
+from flask_mail import Mail, Message
 import os
 from dotenv import load_dotenv
 
@@ -21,11 +22,31 @@ load_dotenv()
 # ----------------------
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your_secret_key_here')
-app.config['SQLALCHEMY_DATABASE_URI'] = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
 
+# ----------------------
+# DATABASE CONFIG
+# ----------------------
+db_url = os.getenv('DATABASE_URL')
+if db_url and db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///test.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Upload folder
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# ----------------------
+# FLASK-MAIL CONFIG
+# ----------------------
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_USERNAME')
+
+mail = Mail(app)
 
 # ----------------------
 # DATABASE SETUP
@@ -39,7 +60,6 @@ login_manager = LoginManager()
 login_manager.login_view = 'login'
 login_manager.init_app(app)
 
-
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -47,8 +67,6 @@ def load_user(user_id):
 # ======================
 # DATABASE MODELS
 # ======================
-
-
 class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
@@ -57,17 +75,16 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     profile_pic = db.Column(db.String(200), default="default.png")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_verified = db.Column(db.Boolean, default=False)
 
     items = db.relationship("Item", backref="user", lazy=True)
-    notifications = db.relationship(
-        "Notification", backref="receiver", lazy=True)
+    notifications = db.relationship("Notification", backref="receiver", lazy=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-
 
 class Item(db.Model):
     __tablename__ = "items"
@@ -81,29 +98,22 @@ class Item(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
 
-
 class Notification(db.Model):
     __tablename__ = "notifications"
     id = db.Column(db.Integer, primary_key=True)
     message = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_read = db.Column(db.Boolean, default=False)
-    receiver_id = db.Column(
-        db.Integer, db.ForeignKey("users.id"), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
 
 # ======================
 # FLASK-WTF FORMS
 # ======================
-
-
 class RegistrationForm(FlaskForm):
-    username = StringField('Username', validators=[
-                           DataRequired(), Length(min=3, max=50)])
+    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=50)])
     email = StringField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[
-                             DataRequired(), Length(min=6)])
-    confirm_password = PasswordField('Confirm Password', validators=[
-                                     DataRequired(), EqualTo('password')])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
     submit = SubmitField('Register')
 
     def validate_username(self, username):
@@ -114,30 +124,23 @@ class RegistrationForm(FlaskForm):
         if User.query.filter_by(email=email.data).first():
             raise ValidationError('Email already exists.')
 
-
 class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Login')
 
-
 class ItemForm(FlaskForm):
     title = StringField('Title', validators=[DataRequired()])
     description = TextAreaField('Description')
-    category = SelectField('Category', choices=[(
-        'Electronics', 'Electronics'), ('Clothes', 'Clothes'), ('Other', 'Other')])
-    status = SelectField('Status', choices=[
-                         ('Lost', 'Lost'), ('Found', 'Found')])
+    category = SelectField('Category', choices=[('Electronics', 'Electronics'), ('Clothes', 'Clothes'), ('Other', 'Other')])
+    status = SelectField('Status', choices=[('Lost', 'Lost'), ('Found', 'Found')])
     location = StringField('Location', validators=[DataRequired()])
-    photo = FileField('Photo', validators=[FileAllowed(
-        ['jpg', 'jpeg', 'png'], 'Images only!')])
+    photo = FileField('Photo', validators=[FileAllowed(['jpg', 'jpeg', 'png'], 'Images only!')])
     submit = SubmitField('Report Item')
 
 # ======================
 # LOGIN REQUIREMENT
 # ======================
-
-
 @app.before_request
 def require_login():
     allowed_routes = ['login', 'register', 'static']
@@ -147,19 +150,9 @@ def require_login():
 # ======================
 # ROUTES
 # ======================
-
-
 @app.route('/')
 def home():
     return redirect(url_for('dashboard') if current_user.is_authenticated else url_for('login'))
-
-
-@app.route('/index')
-@login_required
-def index():
-    items = Item.query.order_by(Item.created_at.desc()).limit(10).all()
-    return render_template('index.html', items=items)
-
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -169,10 +162,33 @@ def register():
         new_user.set_password(form.password.data)
         db.session.add(new_user)
         db.session.commit()
-        flash('Account created! You can now log in.', 'success')
+
+        # Send verification email
+        token = f"{new_user.id}-{new_user.email}"
+        verify_url = url_for('verify_email', token=token, _external=True)
+        msg = Message('Verify Your Email', recipients=[new_user.email])
+        msg.body = f"Hi {new_user.username},\n\nPlease verify your email by clicking the following link:\n{verify_url}\n\nThanks!"
+        mail.send(msg)
+
+        flash('Account created! Please check your email to verify your account.', 'success')
         return redirect(url_for('login'))
+
     return render_template('register.html', form=form)
 
+@app.route('/verify_email/<token>')
+def verify_email(token):
+    try:
+        user_id, email = token.split('-')
+        user = User.query.get(int(user_id))
+        if user and user.email == email:
+            user.is_verified = True
+            db.session.commit()
+            flash('Email verified successfully!', 'success')
+        else:
+            flash('Invalid verification link.', 'danger')
+    except:
+        flash('Invalid token.', 'danger')
+    return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -181,33 +197,29 @@ def login():
         user = User.query.filter_by(email=form.email.data).first()
         if user and user.check_password(form.password.data):
             login_user(user)
-            flash('Logged in successfully!', 'success')
             return redirect(url_for('dashboard'))
-        flash('Invalid email or password', 'danger')
+        flash('Invalid email or password.', 'danger')
     return render_template('login.html', form=form)
-
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
-    flash('Logged out successfully', 'info')
     return redirect(url_for('login'))
 
-
+# ======================
+# DASHBOARD ROUTE
+# ======================
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    items = Item.query.filter_by(user_id=current_user.id).all()
-    notifications = Notification.query.filter_by(receiver_id=current_user.id).order_by(
-        Notification.created_at.desc()).limit(5).all()
+    items = Item.query.filter_by(user_id=current_user.id).order_by(Item.created_at.desc()).all()
+    notifications = Notification.query.filter_by(receiver_id=current_user.id).order_by(Notification.created_at.desc()).all()
     return render_template('dashboard.html', items=items, notifications=notifications)
 
 # ======================
 # REPORT ROUTE
 # ======================
-
-
 @app.route('/report', methods=['GET', 'POST'])
 @login_required
 def report():
@@ -216,8 +228,7 @@ def report():
         photo_filename = None
         if form.photo.data:
             photo_filename = secure_filename(form.photo.data.filename)
-            form.photo.data.save(os.path.join(
-                app.config['UPLOAD_FOLDER'], photo_filename))
+            form.photo.data.save(os.path.join(app.config['UPLOAD_FOLDER'], photo_filename))
 
         new_item = Item(
             title=form.title.data,
@@ -230,60 +241,73 @@ def report():
         )
         db.session.add(new_item)
         db.session.commit()
+
+        # If FOUND, notify owners of matching LOST items
+        if new_item.status == 'Found':
+            lost_items = Item.query.filter_by(title=new_item.title, status='Lost').all()
+            for lost_item in lost_items:
+                message_text = f"Your lost item '{lost_item.title}' has been reported as FOUND by {current_user.username}."
+                notification = Notification(message=message_text, receiver_id=lost_item.user_id)
+                db.session.add(notification)
+
+                owner = User.query.get(lost_item.user_id)
+                if owner.is_verified:
+                    try:
+                        msg = Message('Lost Item Found Notification', recipients=[owner.email])
+                        msg.body = f"Hi {owner.username},\n\n{message_text}\n\nCheck your dashboard for more details."
+                        mail.send(msg)
+                    except Exception as e:
+                        print(f"Failed to send email: {e}")
+
+            db.session.commit()
+
         flash('Item reported successfully!', 'success')
         return redirect(url_for('dashboard'))
 
-    items = Item.query.filter_by(user_id=current_user.id).order_by(
-        Item.created_at.desc()).all()
+    items = Item.query.filter_by(user_id=current_user.id).order_by(Item.created_at.desc()).all()
     return render_template('report.html', form=form, items=items)
 
 # ======================
-# NOTIFICATIONS
+# FILTER ITEMS ROUTE
 # ======================
-
-
-@app.route('/notifications/mark_read/<int:note_id>', methods=['POST'])
-@login_required
-def mark_notification_read(note_id):
-    note = Notification.query.filter_by(
-        id=note_id, receiver_id=current_user.id).first()
-    if note:
-        note.is_read = True
-        db.session.commit()
-        return jsonify({'success': True})
-    return jsonify({'success': False}), 404
-
-
-@app.route('/notifications')
-@login_required
-def notifications():
-    notifications = Notification.query.filter_by(
-        receiver_id=current_user.id).order_by(Notification.created_at.desc()).all()
-    return render_template('notifications.html', notifications=notifications)
-
-
 @app.route('/items/<status>')
 @login_required
 def filter_items(status):
     if status not in ['Lost', 'Found']:
-        flash('Invalid status', 'danger')
-        return redirect(url_for('index'))
-    items = Item.query.filter_by(status=status).order_by(
-        Item.created_at.desc()).all()
-    template = 'lost.html' if status == 'Lost' else 'found.html'
-    return render_template(template, items=items)
+        flash('Invalid item status.', 'danger')
+        return redirect(url_for('dashboard'))
 
+    items = Item.query.filter_by(user_id=current_user.id, status=status).order_by(Item.created_at.desc()).all()
+    notifications = Notification.query.filter_by(receiver_id=current_user.id).order_by(Notification.created_at.desc()).all()
+    return render_template('dashboard.html', items=items, notifications=notifications)
 
-@app.route('/test_notifications')
-def test_notifications():
-    return render_template('notifications.html', items=[], notifications=[])
+# ======================
+# VIEW ALL NOTIFICATIONS
+# ======================
+@app.route('/notifications')
+@login_required
+def notifications():
+    all_notifications = Notification.query.filter_by(receiver_id=current_user.id).order_by(Notification.created_at.desc()).all()
+    return render_template('notifications.html', notifications=all_notifications)
 
+# ======================
+# TEST EMAIL ROUTE
+# ======================
+@app.route('/test-email')
+def test_email():
+    try:
+        msg = Message(
+            subject="Test Email from Flask",
+            recipients=[os.getenv('MAIL_USERNAME')],
+            body="This is a test email to check Flask-Mail setup."
+        )
+        mail.send(msg)
+        return "Test email sent! Check your inbox."
+    except Exception as e:
+        return f"Error sending email: {e}"
 
 # ======================
 # RUN APP
 # ======================
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    # Updated for Render deployment
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=True)

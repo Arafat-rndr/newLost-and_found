@@ -81,33 +81,44 @@
                 <thead class="table-dark">
                     <tr>
                         <th>Title</th>
-                        <th>Category</th>
                         <th>Status</th>
+                        <th>Category</th>
                         <th>Location</th>
+                        <th>Reported At</th>
                         <th>Photo</th>
-                        <th>Date Reported</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in items %}
                     <tr>
                         <td>{{ item.title }}</td>
+                        <td>
+                            {% if item.status == 'Lost' %}
+                            <span class="badge bg-danger">{{ item.status }}</span>
+                            {% else %}
+                            <span class="badge bg-success">{{ item.status }}</span>
+                            {% endif %}
+                        </td>
                         <td>{{ item.category }}</td>
-                        <td>{{ item.status }}</td>
                         <td>{{ item.location }}</td>
+                        <td>{{ item.created_at.strftime('%d %b %Y, %H:%M') }}</td>
                         <td>
                             {% if item.photo %}
-                            <img src="{{ url_for('static', filename='uploads/' ~ item.photo) }}" alt="Item photo"
-                                width="80">
+                            <img src="{{ url_for('static', filename='uploads/' ~ item.photo) }}" alt="Item photo" width="80">
                             {% else %}
                             N/A
                             {% endif %}
                         </td>
-                        <td>{{ item.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-10">
+            <p class="text-muted text-center">You have not reported any items yet.</p>
         </div>
     </div>
     {% endif %}

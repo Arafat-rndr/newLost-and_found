@@ -12,7 +12,8 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('index') }}">Lost & Found</a>
+            <!-- Fixed brand link -->
+            <a class="navbar-brand" href="{{ url_for('home') }}">Lost & Found</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -25,17 +26,14 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('report') }}">Report Item</a>
                     </li>
-                    <!-- Dropdown for Lost & Found -->
+                    <!-- Dropdown for Items -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
                             data-bs-toggle="dropdown" aria-expanded="false">
                             Items
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                            <li><a class="dropdown-item" href="{{ url_for('filter_items', status='Lost') }}">Lost</a>
-                            </li>
-                            <li><a class="dropdown-item" href="{{ url_for('filter_items', status='Found') }}">Found</a>
-                            </li>
+                            <!-- You can add routes here if you implement filter_items -->
                         </ul>
                     </li>
                     <li class="nav-item">
